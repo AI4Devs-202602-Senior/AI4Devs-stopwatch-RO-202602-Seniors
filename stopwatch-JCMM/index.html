@@ -1,13 +1,393 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Timer and Countdown</title>
-<link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stopwatch &amp; Countdown</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ─── Reset & Tokens ────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #f0ede8;
+      --surface:   #ffffff;
+      --border:    #dedad3;
+      --text:      #1a1814;
+      --muted:     #9b9690;
+      --accent:    #e85d26;
+      --accent-lt: #fdeee7;
+      --green:     #2a9d5c;
+      --green-lt:  #e6f7ee;
+      --ring-bg:   #e8e4de;
+      --shadow:    0 2px 8px rgba(0,0,0,.06), 0 12px 40px rgba(0,0,0,.08);
+      --radius:    20px;
+      --mono:      'DM Mono', monospace;
+      --sans:      'Outfit', sans-serif;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    /* ─── Card ──────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      width: 100%;
+      max-width: 420px;
+      overflow: hidden;
+    }
+
+    /* ─── Tabs ──────────────────────────────────────────────────────── */
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-btn {
+      font-family: var(--sans);
+      font-size: .85rem;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      padding: 1rem;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      transition: color .2s, background .2s;
+      position: relative;
+    }
+    .tab-btn::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: 20%; right: 20%;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 2px 2px 0 0;
+      opacity: 0;
+      transition: opacity .2s;
+    }
+    .tab-btn.active { color: var(--accent); }
+    .tab-btn.active::after { opacity: 1; }
+    .tab-btn:hover:not(.active) { background: var(--bg); color: var(--text); }
+
+    /* ─── Panel ─────────────────────────────────────────────────────── */
+    .panel { display: none; flex-direction: column; align-items: center; padding: 2rem 1.5rem 1.75rem; }
+    .panel.active { display: flex; }
+
+    /* ─── SVG Ring ──────────────────────────────────────────────────── */
+    .ring-wrap {
+      position: relative;
+      width: 220px;
+      height: 220px;
+      margin-bottom: 1.5rem;
+      flex-shrink: 0;
+    }
+    .ring-wrap svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+    .ring-track {
+      fill: none;
+      stroke: var(--ring-bg);
+      stroke-width: 10;
+    }
+    .ring-prog {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 10;
+      stroke-linecap: round;
+      transition: stroke-dashoffset .1s linear, stroke .4s;
+    }
+    .ring-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: .2rem;
+    }
+
+    /* ─── Display ───────────────────────────────────────────────────── */
+    .display {
+      font-family: var(--mono);
+      font-size: 2.6rem;
+      font-weight: 400;
+      letter-spacing: .06em;
+      line-height: 1;
+      color: var(--text);
+      transition: color .3s;
+    }
+    .display.flash { animation: flash 0.6s ease-in-out infinite; }
+    @keyframes flash {
+      0%, 100% { color: var(--accent); }
+      50%       { color: var(--text); }
+    }
+    .display-sub {
+      font-family: var(--mono);
+      font-size: .9rem;
+      color: var(--muted);
+      letter-spacing: .06em;
+    }
+
+    /* ─── Countdown Inputs ──────────────────────────────────────────── */
+    .cd-inputs {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: .25rem;
+    }
+    .cd-unit { display: flex; flex-direction: column; align-items: center; gap: .3rem; }
+    .cd-unit label { font-size: .65rem; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+    .cd-field {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .cd-spinner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .cd-spin-btn {
+      width: 28px; height: 22px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: .7rem;
+      color: var(--muted);
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s, color .15s;
+      line-height: 1;
+    }
+    .cd-spin-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .cd-num-input {
+      font-family: var(--mono);
+      font-size: 2.6rem;
+      font-weight: 400;
+      width: 80px;
+      text-align: center;
+      border: none;
+      background: none;
+      color: var(--text);
+      letter-spacing: .06em;
+      padding: .1rem 0;
+      -moz-appearance: textfield;
+    }
+    .cd-num-input::-webkit-inner-spin-button,
+    .cd-num-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+    .cd-num-input:focus { outline: none; color: var(--accent); }
+    .cd-sep {
+      font-family: var(--mono);
+      font-size: 2rem;
+      color: var(--muted);
+      margin-top: -.2rem;
+    }
+
+    /* ─── Buttons ───────────────────────────────────────────────────── */
+    .btn-row {
+      display: flex;
+      gap: .65rem;
+      margin-top: 1.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .btn {
+      font-family: var(--sans);
+      font-size: .82rem;
+      font-weight: 600;
+      letter-spacing: .05em;
+      padding: .65rem 1.25rem;
+      border-radius: 50px;
+      border: 1.5px solid transparent;
+      cursor: pointer;
+      transition: background .18s, color .18s, border-color .18s, opacity .18s, transform .1s;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(.96); }
+    .btn:disabled { opacity: .38; cursor: not-allowed; transform: none; }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .btn-primary:hover:not(:disabled) { background: #c94d1a; border-color: #c94d1a; }
+
+    .btn-secondary {
+      background: var(--bg);
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .btn-secondary:hover:not(:disabled) { background: var(--border); }
+
+    .btn-ghost {
+      background: none;
+      color: var(--muted);
+      border-color: var(--border);
+    }
+    .btn-ghost:hover:not(:disabled) { color: var(--text); border-color: var(--muted); }
+
+    .btn-green {
+      background: var(--green);
+      color: #fff;
+      border-color: var(--green);
+    }
+    .btn-green:hover:not(:disabled) { background: #21834c; border-color: #21834c; }
+
+    /* ─── Lap List ──────────────────────────────────────────────────── */
+    .laps {
+      width: 100%;
+      max-height: 160px;
+      overflow-y: auto;
+      margin-top: 1.25rem;
+      border-top: 1px solid var(--border);
+      padding-top: .75rem;
+    }
+    .laps:empty { display: none; }
+    .lap-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: .4rem .2rem;
+      border-bottom: 1px solid var(--border);
+      font-size: .82rem;
+      animation: slideIn .2s ease;
+    }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } }
+    .lap-num { font-weight: 600; color: var(--muted); min-width: 2.5rem; }
+    .lap-time { font-family: var(--mono); font-size: .85rem; }
+    .lap-delta { font-family: var(--mono); font-size: .78rem; color: var(--muted); }
+
+    /* ─── Done Banner ───────────────────────────────────────────────── */
+    .done-banner {
+      display: none;
+      background: #fdeee7;
+      border: 1px solid #f5c4ad;
+      color: var(--accent);
+      border-radius: 10px;
+      padding: .6rem 1.2rem;
+      font-size: .85rem;
+      font-weight: 600;
+      margin-top: 1rem;
+      text-align: center;
+      animation: pulse 1s ease infinite;
+    }
+    .done-banner.visible { display: block; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .6; } }
+
+    /* ─── Scrollbar ─────────────────────────────────────────────────── */
+    .laps::-webkit-scrollbar { width: 4px; }
+    .laps::-webkit-scrollbar-track { background: transparent; }
+    .laps::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ─── Responsive ────────────────────────────────────────────────── */
+    @media (max-width: 380px) {
+      .display, .cd-num-input { font-size: 2rem; }
+      .ring-wrap { width: 180px; height: 180px; }
+      .btn { font-size: .75rem; padding: .55rem 1rem; }
+    }
+  </style>
 </head>
 <body>
-<h1>Timer and Countdown</h1>
+
+<div class="card">
+  <!-- Tabs -->
+  <div class="tabs" role="tablist">
+    <button class="tab-btn active" id="tab-sw" role="tab" aria-selected="true"  aria-controls="panel-sw"  onclick="switchTab('sw')">⏱ Stopwatch</button>
+    <button class="tab-btn"        id="tab-cd" role="tab" aria-selected="false" aria-controls="panel-cd"  onclick="switchTab('cd')">⏳ Countdown</button>
+  </div>
+
+  <!-- ── Stopwatch Panel ────────────────────────────── -->
+  <div class="panel active" id="panel-sw" role="tabpanel" aria-labelledby="tab-sw">
+    <div class="ring-wrap" aria-hidden="true">
+      <svg viewBox="0 0 220 220">
+        <circle class="ring-track" cx="110" cy="110" r="95"/>
+        <circle class="ring-prog" id="sw-ring" cx="110" cy="110" r="95"/>
+      </svg>
+      <div class="ring-center">
+        <div class="display" id="sw-display">00:00<span class="display-sub">:00</span></div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary"   id="sw-start"  onclick="swStart()">Start</button>
+      <button class="btn btn-secondary" id="sw-pause"  onclick="swPause()"  disabled>Pause</button>
+      <button class="btn btn-ghost"     id="sw-lap"    onclick="swLap()"    disabled>Lap</button>
+      <button class="btn btn-ghost"     id="sw-reset"  onclick="swReset()"  disabled>Reset</button>
+    </div>
+
+    <div class="laps" id="sw-laps" role="list" aria-label="Lap times"></div>
+  </div>
+
+  <!-- ── Countdown Panel ───────────────────────────── -->
+  <div class="panel" id="panel-cd" role="tabpanel" aria-labelledby="tab-cd">
+    <div class="ring-wrap" aria-hidden="true">
+      <svg viewBox="0 0 220 220">
+        <circle class="ring-track" cx="110" cy="110" r="95"/>
+        <circle class="ring-prog" id="cd-ring" cx="110" cy="110" r="95" style="stroke:var(--green)"/>
+      </svg>
+      <div class="ring-center">
+        <!-- Editable inputs (shown when stopped) -->
+        <div class="cd-inputs" id="cd-inputs">
+          <div class="cd-unit">
+            <div class="cd-spinner">
+              <button class="cd-spin-btn" onclick="cdSpin('h',1)" aria-label="Increase hours">▲</button>
+              <input class="cd-num-input" id="cd-h" type="number" min="0" max="99" value="0" aria-label="Hours">
+              <button class="cd-spin-btn" onclick="cdSpin('h',-1)" aria-label="Decrease hours">▼</button>
+            </div>
+            <label>h</label>
+          </div>
+          <span class="cd-sep">:</span>
+          <div class="cd-unit">
+            <div class="cd-spinner">
+              <button class="cd-spin-btn" onclick="cdSpin('m',1)" aria-label="Increase minutes">▲</button>
+              <input class="cd-num-input" id="cd-m" type="number" min="0" max="59" value="0" aria-label="Minutes">
+              <button class="cd-spin-btn" onclick="cdSpin('m',-1)" aria-label="Decrease minutes">▼</button>
+            </div>
+            <label>m</label>
+          </div>
+          <span class="cd-sep">:</span>
+          <div class="cd-unit">
+            <div class="cd-spinner">
+              <button class="cd-spin-btn" onclick="cdSpin('s',1)" aria-label="Increase seconds">▲</button>
+              <input class="cd-num-input" id="cd-s" type="number" min="0" max="59" value="0" aria-label="Seconds">
+              <button class="cd-spin-btn" onclick="cdSpin('s',-1)" aria-label="Decrease seconds">▼</button>
+            </div>
+            <label>s</label>
+          </div>
+        </div>
+        <!-- Read-only display (shown when running/paused) -->
+        <div class="display" id="cd-display" style="display:none">00:00:00</div>
+      </div>
+    </div>
+
+    <div class="done-banner" id="cd-done">⏰ Time's up!</div>
+
+    <div class="btn-row">
+      <button class="btn btn-green"     id="cd-start"  onclick="cdStart()">Start</button>
+      <button class="btn btn-secondary" id="cd-pause"  onclick="cdPause()"  disabled>Pause</button>
+      <button class="btn btn-ghost"     id="cd-reset"  onclick="cdReset()"  disabled>Reset</button>
+    </div>
+  </div>
+</div>
+
 <script src="script.js"></script>
 </body>
 </html>
